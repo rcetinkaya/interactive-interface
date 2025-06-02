@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 function PaperClient() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [paper, setPaper] = useState<any>(null);
+    const [ready, setReady] = useState(false);
     const [vInput, setVInput] = useState("");
     const [hInput, setHInput] = useState("");
     const [params, setParams] = useState({
@@ -17,11 +18,19 @@ function PaperClient() {
         customH: [] as number[],
     });
     useEffect(() => {
-        (async () => {
-          const mod = await import("paper/dist/paper-core.min.js");
-          setPaper(mod.default || mod); // Bazı bundler'larda `default` içinde geliyor
-        })();
+        const script = document.createElement("script");
+        script.src = "/libs/paper-full.js";
+        script.async = true;
+        script.onload = () => {
+          setPaper((window as any).paper); // window.paper'dan eriş
+        };
+        document.body.appendChild(script);
       }, []);
+    useEffect(() => {
+        if (paper && canvasRef.current) {
+            setReady(true); // her ikisi de yüklendi
+        }
+    }, [paper, canvasRef.current]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setParams({ ...params, [e.target.name]: Number(e.target.value) });
@@ -88,6 +97,8 @@ function PaperClient() {
     const drawCanvas = () => {
         if (!paper || !canvasRef.current) return;
         const canvas = canvasRef.current;
+        canvas.width = 800;
+        canvas.height = 600;
         paper.setup(canvas);
         paper.project.activeLayer.removeChildren();
         const bg = new paper.Path.Rectangle(new paper.Rectangle(0, 0, canvas.width, canvas.height));
@@ -124,7 +135,7 @@ function PaperClient() {
             const x = innerRect.left + mm;
             const line = new paper.Path.Line(new paper.Point(x, innerRect.top), new paper.Point(x, innerRect.bottom));
             line.strokeColor = new paper.Color("blue");
-        
+
             new paper.PointText({
                 point: new paper.Point(x + 5, innerRect.top + 15),
                 content: `${mm.toFixed(2)} mm (soldan)`,
@@ -138,7 +149,7 @@ function PaperClient() {
             const y = innerRect.bottom - mm;
             const line = new paper.Path.Line(new paper.Point(innerRect.left, y), new paper.Point(innerRect.right, y));
             line.strokeColor = new paper.Color("red");
-        
+
             new paper.PointText({
                 point: new paper.Point(innerRect.left + 5, y - 5),
                 content: `${mm.toFixed(2)} mm (zeminden)`,
@@ -153,7 +164,7 @@ function PaperClient() {
             const line = new paper.Path.Line(new paper.Point(x, innerRect.top), new paper.Point(x, innerRect.bottom));
             line.strokeColor = new paper.Color("purple");
             line.dashArray = [6, 3];
-        
+
             new paper.PointText({
                 point: new paper.Point(x + 5, innerRect.top + 15),
                 content: `${mm.toFixed(2)} mm (soldan)`,
@@ -168,7 +179,7 @@ function PaperClient() {
             const line = new paper.Path.Line(new paper.Point(innerRect.left, y), new paper.Point(innerRect.right, y));
             line.strokeColor = new paper.Color("orange");
             line.dashArray = [6, 3];
-        
+
             new paper.PointText({
                 point: new paper.Point(innerRect.left + 5, y - 5),
                 content: `${mm.toFixed(2)} mm (zeminden)`,
@@ -203,11 +214,14 @@ function PaperClient() {
             fillColor: "#444",
             fontSize: 12,
         });
-      };
+    };
 
     useEffect(() => {
-        drawCanvas();
-    }, [paper,params]);
+        if (!ready) return;
+        requestAnimationFrame(() => {
+          drawCanvas();
+        });
+      }, [ready, params]);
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-start p-6 gap-8">
@@ -234,22 +248,22 @@ function PaperClient() {
                     <input name="hCount" type="number" value={params.hCount} onChange={handleChange} className="border p-2 rounded mt-1" />
                 </label>
                 <div className="col-span-full flex flex-wrap gap-4">
-                <div className="flex gap-2 items-end">
-                    <label className="flex flex-col text-sm w-full">
-                        Yeni Dikey Kayıt (mm)
-                        <input type="number" value={vInput} onChange={(e) => setVInput(e.target.value)} className="border p-2 rounded mt-1" />
-                    </label>
-                    <button onClick={addCustomVertical} className="px-4 py-2 bg-blue-600 text-white rounded h-fit">Ekle</button>
+                    <div className="flex gap-2 items-end">
+                        <label className="flex flex-col text-sm w-full">
+                            Yeni Dikey Kayıt (mm)
+                            <input type="number" value={vInput} onChange={(e) => setVInput(e.target.value)} className="border p-2 rounded mt-1" />
+                        </label>
+                        <button onClick={addCustomVertical} className="px-4 py-2 bg-blue-600 text-white rounded h-fit">Ekle</button>
+                    </div>
+                    <div className="flex gap-2 items-end">
+                        <label className="flex flex-col text-sm w-full">
+                            Yeni Yatay Kayıt (mm)
+                            <input type="number" value={hInput} onChange={(e) => setHInput(e.target.value)} className="border p-2 rounded mt-1" />
+                        </label>
+                        <button onClick={addCustomHorizontal} className="px-4 py-2 bg-red-600 text-white rounded h-fit">Ekle</button>
+                    </div>
                 </div>
-                <div className="flex gap-2 items-end">
-                    <label className="flex flex-col text-sm w-full">
-                        Yeni Yatay Kayıt (mm)
-                        <input type="number" value={hInput} onChange={(e) => setHInput(e.target.value)} className="border p-2 rounded mt-1" />
-                    </label>
-                    <button onClick={addCustomHorizontal} className="px-4 py-2 bg-red-600 text-white rounded h-fit">Ekle</button>
-                </div>
-                </div>
-               
+
             </div>
 
             {/* Kayıt listeleri */}
